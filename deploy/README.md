@@ -80,22 +80,17 @@ sudo loginctl enable-linger as
 
 ## 环境坑（部署时踩过的）
 
-### git 代理配置是坏的
+### 网络：靠 TUN 模式，不需要 git 代理
 
-服务器全局 git 配置里 `http.proxy` / `https.proxy` 指向 `http://[::1]:7897`，
-但那个端口**没有在监听**。实际可用的代理是 `.bashrc` 里那个 `127.0.0.1:7890`。
+服务器上跑着 Clash，**TUN 模式**（网卡 `utun1024`，网段 `198.18.0.0/30`）透明接管
+全部流量，所以 git 直连 github 即可，**不要配任何 `http.proxy`**。
 
-表现：`git clone` 报 `Failed to connect to ::1 port 7897`。
-
-**本方案的处理**：只给 `~/usage-agent` 这个仓库设**本地**代理配置，不碰全局：
-
-```bash
-cd ~/usage-agent
-git config http.proxy  http://127.0.0.1:7890
-git config https.proxy http://127.0.0.1:7890
-```
-
-> 全局配置仍然是坏的，那台机器上任何其它 git 操作都会失败。值得单独修一下。
+> 这里踩过一个坑：全局 git 配置里曾残留 `http.proxy = http://[::1]:7897`，
+> 而那个端口根本没在监听，导致服务器上所有 git 操作报
+> `Failed to connect to ::1 port 7897`。TUN 起来之后这些配置就是纯累赘，已清除。
+>
+> 判断当前是哪种模式：`ip -brief addr | grep utun`。有 utun 网卡 = TUN 模式，
+> 不需要代理；没有 = 才需要指向 Clash 的 HTTP 端口（通常是 `127.0.0.1:7890`）。
 
 ### 首次运行慢
 
