@@ -30,11 +30,18 @@ test('输出里不含项目名（结构上就没有这个字段）', () => {
   const text = serialize(p);
   assert.ok(!text.includes('SECRET-PROJECT-NAME'), '项目名不得出现在输出里');
   assert.ok(!text.includes('project'), '连 project 这个键名都不该有');
-  // 逐字段确认结构就是白名单
+  // 逐字段确认结构就是白名单。**这是一个正向白名单**：新增字段必须在这里显式加进来，
+  // 否则测试会失败——这样"不小心把某个内部字段带出去"就不会静默发生。
   for (const d of p.days) {
-    assert.deepEqual(Object.keys(d).sort(), ['byModel', 'cacheRead', 'cost', 'date', 'tokens']);
-    for (const m of d.byModel) assert.deepEqual(Object.keys(m).sort(), ['cost', 'model', 'tokens']);
+    assert.deepEqual(Object.keys(d).sort(),
+      ['byModel', 'cacheRead', 'cost', 'date', 'tokens', 'tokensInclCache']);
+    for (const m of d.byModel) {
+      assert.deepEqual(Object.keys(m).sort(),
+        ['cacheRead', 'cost', 'model', 'tokens', 'tokensInclCache']);
+    }
   }
+  assert.deepEqual(Object.keys(p).sort(),
+    ['days', 'host', 'schemaVersion', 'totals', 'updatedAt']);
 });
 
 test('不含绝对路径', () => {
@@ -98,6 +105,36 @@ test('token 总量与 cache read 分开统计', () => {
   const p = buildPayload([bucket({ cachedInputTokens: 9_000_000, totalTokens: 1_000_000 })], prices, { host: 'h', now: NOW });
   assert.equal(p.days[0].tokens, 1_000_000);
   assert.equal(p.days[0].cacheRead, 9_000_000);
+});
+
+test('tokensInclCache 恒等于 tokens + cacheRead（页面和校验器都依赖这条）', () => {
+  const bs = [
+    bucket({ model: 'a', inputTokens: 1_000_000, cachedInputTokens: 9_000_000 }),
+    bucket({ model: 'b', inputTokens: 500_000, cachedInputTokens: 0 }),
+  ];
+  const p = buildPayload(bs, prices, { host: 'h', now: NOW });
+  for (const d of p.days) {
+    assert.equal(d.tokensInclCache, d.tokens + d.cacheRead, `日 ${d.date}`);
+    for (const m of d.byModel) {
+      assert.equal(m.tokensInclCache, m.tokens + m.cacheRead, `模型 ${m.model}`);
+    }
+  }
+  const t = p.totals;
+  assert.equal(t.tokensInclCache, t.tokens + t.cacheRead);
+  assert.equal(t.tokens, p.days.reduce((a, d) => a + d.tokens, 0));
+  assert.equal(t.cacheRead, p.days.reduce((a, d) => a + d.cacheRead, 0));
+  assert.equal(t.days, p.days.length);
+  assert.equal(t.firstDate, p.days[0].date);
+  assert.equal(t.lastDate, p.days[p.days.length - 1].date);
+});
+
+test('没有数据时不写 null（校验器明确拒绝 null）', () => {
+  const p = buildPayload([], prices, { host: 'h', now: NOW });
+  assert.equal(p.days.length, 0);
+  assert.equal(p.totals.days, 0);
+  assert.ok(!('firstDate' in p.totals), 'firstDate 应省略而不是 null');
+  assert.ok(!('lastDate' in p.totals), 'lastDate 应省略而不是 null');
+  assert.ok(!serialize(p).includes('null'), '输出里不该出现 null');
 });
 
 test('序列化可复现 —— 这是「内容未变则跳过写盘」能成立的前提', () => {
