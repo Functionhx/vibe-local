@@ -1,0 +1,33 @@
+# ⚠ 模板：把下面的 YOURUSER 和路径换成你自己的，再安装到 ~/.config/systemd/user/。
+#    systemd 单元里不能用 ~ 或环境变量展开 ExecStart，所以只能写绝对路径。
+
+[Unit]
+Description=每日发布 AI 用量统计到 usage-agent
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+
+Environment=PATH=/home/YOURUSER/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=GH_PROMPT_DISABLED=1
+
+# flock 防并发：上一次还没跑完时，这次直接跳过。
+# `-E 75` 让"已在运行"以退出码 75 返回，配合 SuccessExitStatus=75 视为成功
+# ——否则会被记成失败，而"跳过一次"其实是正常行为。
+ExecStart=/usr/bin/flock -n -E 75 %t/usage-publish.lock /home/YOURUSER/vibe-local/deploy/usage-publish.sh
+SuccessExitStatus=75
+
+# 共享服务器：低优先级。Nice 降 CPU，IOSchedulingClass 降 IO。
+Nice=10
+IOSchedulingClass=idle
+
+# 首次运行要为 ~/.codex（数 GB）建索引缓存，比较慢；之后就快了。
+TimeoutStartSec=45min
+
+# 加固
+NoNewPrivileges=true
+ProtectSystem=full
+
+[Install]
+WantedBy=default.target

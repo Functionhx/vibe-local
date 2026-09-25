@@ -1,0 +1,32 @@
+{
+  "name": "vibe-local",
+  "version": "0.1.0",
+  "description": "Local-only token usage and cost tracker for AI coding tools. No upload, no daemon, no network.",
+  "type": "module",
+  "bin": {
+    "vibe-local": "bin/vibe-local.js"
+  },
+  "files": [
+    "bin/",
+    "src/"
+  ],
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {},
+  "keywords": [
+    "ai",
+    "coding",
+    "usage",
+    "tokens",
+    "cost",
+    "claude-code",
+    "codex",
+    "opencode",
+    "gemini-cli"
+  ],
+  "license": "MIT"
+}

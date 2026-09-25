@@ -1,0 +1,26 @@
+[Unit]
+Description=每日触发用量发布（目标 UTC+8 04:00）
+
+[Timer]
+# 目标时刻是 **UTC+8 04:00**，而服务器的系统时区是 America/Los_Angeles，
+# systemd v249 的 OnCalendar 不支持指定时区，所以写成本地时刻：
+#
+#   夏令时 PDT (UTC-7)：本地 13:00 = UTC+8 04:00   ← 与目标一致
+#   冬令时 PST (UTC-8)：本地 13:00 = UTC+8 05:00   ← 偏 1 小时
+#
+# 这个 ±1 小时的漂移是**无害的**，两个理由：
+#   1. 目标 UTC+8 日在本地 09:00/08:00 就已经结束，而任务在本地 13:00 跑，
+#      余量 4–5 小时，怎么漂都还在当天之内。
+#   2. 「该报哪一天」由脚本按当前 UTC 时刻**自己推算**，不看 timer 触发在几点。
+#      所以即使漂了、即使补跑在几天后，算出的目标日依然正确。
+OnCalendar=*-*-* 13:00:00
+
+# 服务器经常关机，cron 不会补跑错过的任务。Persistent=true 让 systemd 在下次
+# 开机时补上错过的运行 —— 这是选 systemd timer 而不是 cron 的主要理由。
+Persistent=true
+
+# 允许最多 1 分钟的调度误差（默认更严，没必要）
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

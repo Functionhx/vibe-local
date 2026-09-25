@@ -1,0 +1,12 @@
+node_modules/
+
+# 本地状态：一律不进仓库
+# （正常情况下这些都在 ~/.vibe-local/，此处仅为防手滑）
+.vibe-local/
+cache/
+mirror/
+manual.jsonl
+*.local.json
+
+.DS_Store
+npm-debug.log*
